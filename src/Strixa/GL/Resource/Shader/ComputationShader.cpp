@@ -8,7 +8,7 @@ using Strixa::GL::Resource::Shader::ComputationShader;
 
 
 /* Begin Class Definition:  ComputationShader */
-ComputationShader::ComputationShader(const char* filename)
-: BasicShader(GL_COMPUTE_SHADER,filename)
+ComputationShader::ComputationShader(const char* source,size_t source_length)
+: BasicShader(GL_COMPUTE_SHADER,source,source_length)
 {
 }

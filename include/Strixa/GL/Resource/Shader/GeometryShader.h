@@ -16,7 +16,7 @@ namespace Strixa
                 {
                     /* Member Methods */
                     public:
-                        GeometryShader(const char* filename = nullptr);
+                        GeometryShader(const char* source,size_t source_length = 0);
                 };
             }
         }

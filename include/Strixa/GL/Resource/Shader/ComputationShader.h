@@ -16,7 +16,7 @@ namespace Strixa
                 {
                     /* Member Methods */
                     public:
-                        ComputationShader(const char* filename = nullptr);
+                        ComputationShader(const char* source,size_t source_size = 0);
                 };
             }
         }

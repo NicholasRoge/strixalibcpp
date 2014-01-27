@@ -3,6 +3,7 @@
 #include <Strixa/GL/Resource/Program/Renderer.h>
 #include <Strixa/GL/Resource/Shader/FragmentShader.h>
 #include <Strixa/GL/Resource/Shader/VertexShader.h>
+#include <Strixa/Util/File.h>
 #include <Strixa/Util/Log.h>
 
 #include <iostream>
@@ -10,33 +11,33 @@
 using Strixa::GL::Resource::Program::Renderer;
 using Strixa::GL::Resource::Shader::FragmentShader;
 using Strixa::GL::Resource::Shader::VertexShader;
+using Strixa::Util::File;
 using Strixa::Util::Log;
 
 
 Renderer::Renderer()
 {
+    std::string shader_source;
+
+
     this->running = false;
     this->rendering = false;
     this->render_thread_id = 0;
 
-    this->setFramerate(10);
+    this->setFramerate(60);
 
-    /* Compile the vertex shader. */
-    VertexShader vertex_shader;
+    /* Attach the shaders. */
+    shader_source = File("../default.vs.glsl").read(0);  // Hopefully I'll never have to deal with any 4g shader files...
+    VertexShader vertex_shader(shader_source.c_str());
+
+    shader_source = File("../default.fs.glsl").read(0);
+    FragmentShader fragment_shader(shader_source.c_str());
 
 
-    vertex_shader.setSourceFile("../default.vs.glsl");
-    vertex_shader.compile();
     this->attachShader(vertex_shader);
-    vertex_shader.destroy();
-
-    /* Compile the fragment shader. */
-    FragmentShader fragment_shader;
-
-    
-    fragment_shader.setSourceFile("../default.fs.glsl");
-    fragment_shader.compile();
     this->attachShader(fragment_shader);
+    
+    vertex_shader.destroy();
     fragment_shader.destroy();
 
     /* Link the attached shaders into the program. */

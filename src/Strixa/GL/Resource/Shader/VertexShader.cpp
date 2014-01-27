@@ -8,7 +8,7 @@ using Strixa::GL::Resource::Shader::VertexShader;
 
 
 /* Begin Class Definition:  VertexShader */
-VertexShader::VertexShader(const char* filename)
-: BasicShader(GL_VERTEX_SHADER,filename)
+VertexShader::VertexShader(const char* source,size_t source_size)
+: BasicShader(GL_VERTEX_SHADER,source,source_size)
 {
 }

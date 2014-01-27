@@ -16,7 +16,7 @@ namespace Strixa
                 {
                     /* Member Methods */
                     public:
-                        VertexShader(const char* filename = nullptr);
+                        VertexShader(const char* source,unsigned source_length = 0);
                 };
             }
         }

@@ -19,22 +19,17 @@ namespace Strixa
                     /* Member Properties */
                     private:
                         GLuint shader_id;
-                        bool   source_set;
 
                     /* Member Methods */
                     private:
                         virtual void free();
 
                     public:
-                        BasicShader(GLenum type,const char* filename = nullptr);
+                        BasicShader(BasicShader&& move);
+
+                        BasicShader(GLenum type,const char* source,size_t source_length = 0);
                         
-                        void compile();
-
                         std::string getShaderLog() const;
-
-                        void setSource(const char* source);
-
-                        void setSourceFile(const char* filename);
 
                         /**
                          * Returns the OpenGL handle to this object.

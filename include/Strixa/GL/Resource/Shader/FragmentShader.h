@@ -16,7 +16,7 @@ namespace Strixa
                 {
                     /* Member Methods */
                     public:
-                        FragmentShader(const char* filename = nullptr);
+                        FragmentShader(const char* source,size_t source_length = 0);
                 };
             }
         }
