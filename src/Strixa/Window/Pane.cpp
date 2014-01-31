@@ -4,12 +4,14 @@
 
 using namespace Strixa::Graphics;
 using namespace Strixa::Window;
+using Strixa::Util::ThreadLocal;
 
 /* Global Constants */
 const UINT WINDOW_CREATED = RegisterWindowMessage(L"window.created");
+const UINT WINDOW_DESTROYED = RegisterWindowMessage(L"window.destroyed");
 
 /* Global Variables */
-std::map<DWORD,UiThread> Pane::uithread_by_threadid;  // Has the effect of ensuring two windows created on the same thread will share the same message pump.
+ThreadLocal<UiThread> threadlocal_ui_thread;  // Has the effect of ensuring two windows created on the same thread will share the same message pump.
 
 /* Class Definition: UiThread */
 UiThread::UiThread()
@@ -35,7 +37,7 @@ void UiThread::run()
     if (PeekMessage(&message,NULL,0,0,PM_REMOVE) == TRUE) {
         if (message.message == WINDOW_CREATED) {
             window_count++;
-        } else if (message.message == WM_QUIT) {
+        } else if (message.message == WINDOW_DESTROYED) {
             window_count--;
 
             if (window_count == 0) {
@@ -51,14 +53,17 @@ void UiThread::run()
 }
 
 Pane::Pane(const LPTSTR class_name,UINT class_style)
+    : ui_thread(threadlocal_ui_thread.get())
 {
     this->background = CreateSolidBrush(GetSysColor(COLOR_WINDOW));
-    this->exit_code = 0;
+    this->enable_redraw = true;
+    this->exitcode = 0;
+    this->exitcode_future = this->exitcode_promise.get_future();
     this->extended_style = 0;
     this->hwnd = NULL;
+    this->initialized = false;
     this->parent = NULL;
     this->style = 0;
-    this->ui_thread = &Pane::uithread_by_threadid[GetCurrentThreadId()];
 
     if (GetClassInfoEx(GetModuleHandle(NULL),class_name,&this->window_class) == FALSE) {
         this->window_class.cbSize = sizeof(WNDCLASSEX);
@@ -75,7 +80,7 @@ Pane::Pane(const LPTSTR class_name,UINT class_style)
         this->window_class.hIconSm = NULL;
 
         if (RegisterClassEx(&this->window_class) == FALSE) {
-            this->exit_code = GetLastError();
+            // TODO:  Issue some kind of error.
         }
     }
 }
@@ -101,7 +106,7 @@ bool Pane::close(int exit_code,bool force)
 {
     if (this->isAlive()) {
         if (force || this->isClosable()) {
-            this->exit_code = exit_code;
+            this->exitcode = exit_code;
             DestroyWindow(this->hwnd);
 
             return true;
@@ -118,11 +123,14 @@ int Pane::getBackgroundColor() const
     return 0;//TODO
 }
 
-int Pane::getExitCode() const
+int Pane::getExitCode()
 {
-    while (this->hwnd != NULL);
+    if (!this->initialized) {
+        throw std::exception("The window must first be initialized using the 'init' method before you can attempt to retrieve an error code.");
+    }
 
-    return this->exit_code;
+    this->exitcode_future.wait();
+    return exitcode_future.get();
 }
 
 DWORD Pane::getExtendedStyle() const
@@ -155,15 +163,20 @@ DWORD Pane::getStyle() const
     return GetWindowLong(this->hwnd,GWL_STYLE);
 }
 
-UiThread* Pane::getUiThread() const
+UiThread& Pane::getUiThread() const
 {
     return this->ui_thread;
 }
 
-void Pane::init()
+bool Pane::init()
 {
-    if (this->exit_code == 0) {
-        this->ui_thread->now([&](){
+    if (!this->initialized) {
+        /* The window must be created on the UI thread.  Make it so, number one. */
+        bool task_complete;
+
+
+        task_complete = false;
+        this->ui_thread.now([&](){
             this->hwnd = CreateWindowEx(
                 this->extended_style | WS_CLIPCHILDREN,
                 this->window_class.lpszClassName,
@@ -177,26 +190,26 @@ void Pane::init()
                 this
             );
 
-            if (this->hwnd == NULL) {
-                this->exit_code = GetLastError();
-
-                return;
-            }
+            task_complete = true;
         });
-    }
+        while (!task_complete);
 
-    while (this->hwnd == NULL && this->exit_code == 0);
+        /* Ensure the window was created successfully. */
+        if (this->hwnd == NULL) {
+            return false;
+        }
 
-    if (this->exit_code != 0) {
-        throw std::exception("Window Pane initialization failed.",this->exit_code);
-    } else {
-        this->onCreate();
-
+        /* Notify everyone of our window's creation. */
         PostThreadMessage(GetWindowThreadProcessId(this->hwnd,NULL),WINDOW_CREATED,0,0);
+
+        this->onCreate();
+        this->initialized = true;
 
         ShowWindow(this->hwnd,SW_SHOWNORMAL);
         UpdateWindow(this->hwnd);
     }
+
+    return this->initialized;
 }
 
 void Pane::invalidate()
@@ -212,6 +225,11 @@ bool Pane::isAlive()
 bool Pane::isClosable()
 {
     return true;
+}
+
+bool Pane::isRedrawEnabled() const
+{
+    return this->enable_redraw;
 }
 
 void Pane::onClose()
@@ -381,6 +399,11 @@ void Pane::setPosition(long x,long y)
     }
 }
 
+void Pane::setRedrawEnabled(bool enabled)
+{
+    this->enable_redraw = enabled;
+}
+
 void Pane::setSize(long width,long height)
 {
     if (this->isAlive()){
@@ -433,8 +456,10 @@ LRESULT Pane::WndProc(HWND hwnd,UINT message,WPARAM w_param,LPARAM l_param)
         case WM_DESTROY:
             component->onClose();
 
-            PostQuitMessage(component->exit_code);
+            PostThreadMessage(GetWindowThreadProcessId(component->hwnd,NULL),WINDOW_DESTROYED,0,0);
+
             component->hwnd = NULL;
+            component->exitcode_promise.set_value(component->exitcode);
 
             return 0;
 
@@ -447,7 +472,7 @@ LRESULT Pane::WndProc(HWND hwnd,UINT message,WPARAM w_param,LPARAM l_param)
             return 1;
 
         case WM_PAINT:
-            {
+            if (component->enable_redraw) {
                 HDC hdc;
 
 

@@ -3,10 +3,12 @@
 
 #include <Windows.h>
 #include <functional>
+#include <future>
 #include <map>
 #include <Strixa/Graphics/Dimensions.h>
 #include <Strixa/Graphics/Point.h>
 #include <Strixa/Util/TaskableThread.h>
+#include <Strixa/Util/ThreadObject.h>
 
 namespace Strixa
 {
@@ -29,10 +31,6 @@ namespace Strixa
 
         class Pane
         {
-            /* Class Properties */
-            private:
-                static std::map<DWORD,UiThread> uithread_by_threadid;
-
             /* Class Methods */
             private:
                 static LRESULT CALLBACK WndProc(HWND hwnd,UINT message,WPARAM w_param,LPARAM l_param);
@@ -40,16 +38,20 @@ namespace Strixa
             /* Instance Properties */
             private:
                 HBRUSH                        background;
-                LRESULT                       exit_code;
+                bool                          enable_redraw : 1;
+                DWORD                         exitcode;
+                std::future<DWORD>            exitcode_future;
+                std::promise<DWORD>           exitcode_promise;
                 DWORD                         extended_style;
                 HWND                          hwnd;
+                bool                          initialized;
                 RECT                          margin;
                 Frame*                        parent;
                 Strixa::Graphics::Point       position;
                 Strixa::Graphics::Dimensions  size;
                 DWORD                         style;
-                UiThread*                     ui_thread;
-                WNDCLASSEX                    window_class;   
+                UiThread&                     ui_thread;
+                WNDCLASSEX                    window_class;
 
             /* Instance Methods*/
             protected:
@@ -80,7 +82,7 @@ namespace Strixa
 
                 int getBackgroundColor() const;
 
-                int getExitCode() const;
+                int getExitCode();
 
                 DWORD getExtendedStyle() const;
 
@@ -96,13 +98,15 @@ namespace Strixa
 
                 Strixa::Graphics::Dimensions getSize() const;
 
-                UiThread* getUiThread() const;
+                UiThread& getUiThread() const;
 
-                virtual void init();
+                virtual bool init();
 
                 void invalidate();
 
                 bool isAlive();
+
+                bool isRedrawEnabled() const;
 
                 virtual bool isClosable();
 
@@ -117,6 +121,8 @@ namespace Strixa
                 virtual void setExtendedStyle(DWORD style);
 
                 void setParent(Frame* parent);
+
+                void setRedrawEnabled(bool enabled);
 
                 void setPosition(long x,long y);
 
