@@ -2,8 +2,9 @@
 
 #include <Strixa/Window/Frame.h>
 
-using namespace Strixa::Graphics;
-using namespace Strixa::Window;
+using Strixa::Window::Frame;
+using Strixa::Window::Pane;
+using Strixa::Window::UiThread;
 using Strixa::Util::ThreadLocal;
 
 /* Global Constants */
@@ -138,6 +139,11 @@ DWORD Pane::getExtendedStyle() const
     return GetWindowLong(this->hwnd,GWL_EXSTYLE);
 }
 
+int Pane::getHeight() const
+{
+    return this->size.height;
+}
+
 HWND Pane::getNativeHandle() const
 {
     return this->hwnd;
@@ -148,19 +154,24 @@ Frame* Pane::getParent() const
     return this->parent;
 }
 
-Point Pane::getPosition() const
+int Pane::getPosX() const
 {
-    return this->position;
+    return this->position.x;
 }
 
-Dimensions Pane::getSize() const
+int Pane::getPosY() const
 {
-    return this->size;
+    return this->position.y;
 }
 
 DWORD Pane::getStyle() const
 {
     return GetWindowLong(this->hwnd,GWL_STYLE);
+}
+
+int Pane::getWidth() const
+{
+    return this->size.width;
 }
 
 UiThread& Pane::getUiThread() const
@@ -244,9 +255,8 @@ void Pane::onMove()
 {
 }
 
-bool Pane::onMoveProposed(const Point& proposed_position)
+void Pane::onMoveProposed(int& x,int& y)
 {
-    return true;
 }
 
 void Pane::onPaint(HDC device_context)
@@ -266,9 +276,8 @@ void Pane::onResize()
 {
 }
 
-bool Pane::onResizeProposed(const Dimensions& proposed_position)
+void Pane::onResizeProposed(int& width,int& height)
 {
-    return true;
 }
 
 void Pane::removeExtendedStyle(DWORD style)
@@ -489,29 +498,31 @@ LRESULT Pane::WndProc(HWND hwnd,UINT message,WPARAM w_param,LPARAM l_param)
         
         case WM_SIZING:
             {
-                Point      proposed_position;
-                RECT*      proposed_rect = (RECT*)l_param;
-                Dimensions proposed_size;
+                RECT* proposed = (RECT*)l_param;
+                int   proposed_x;
+                int   proposed_y;
+                int   proposed_height;
+                int   proposed_width;
 
 
-                proposed_position.x = proposed_rect->left;
-                proposed_position.y = proposed_rect->top;
-                proposed_size.width = proposed_rect->right - proposed_rect->left;
-                proposed_size.height = proposed_rect->bottom - proposed_rect->top;
-                
-                if (
-                    !(
-                        component->position != proposed_position
-                        && 
-                        component->onMoveProposed(proposed_position)
-                    )
-                    ||
-                    !component->onResizeProposed(proposed_size)
-                ) {
-                    proposed_rect->left = component->position.x;
-                    proposed_rect->top = component->position.y;
-                    proposed_rect->right = component->position.x + component->size.width;
-                    proposed_rect->bottom = component->position.y + component->size.height;
+                proposed_x = proposed->left;
+                proposed_y = proposed->top;
+                proposed_height = proposed->bottom - proposed->top;
+                proposed_width = proposed->right - proposed->left;
+
+                if (component->position.x != proposed_x || component->position.y != proposed_y) {
+                    component->onMoveProposed(proposed_x,proposed_y);
+                    
+                    proposed->left = component->position.x;
+                    proposed->top = component->position.y;
+                    proposed->bottom = proposed->top + proposed_height;
+                    proposed->right = proposed->left + proposed_width;
+                }
+                if (component->size.height != proposed_height || component->size.width != proposed_width) {
+                    component->onMoveProposed(proposed_x,proposed_y);
+
+                    proposed->bottom = proposed->top + component->size.height;
+                    proposed->right = proposed->left + component->size.width;
                 }
             }
 
@@ -532,33 +543,19 @@ LRESULT Pane::WndProc(HWND hwnd,UINT message,WPARAM w_param,LPARAM l_param)
 
 
                 proposed = (WINDOWPOS*)l_param;
-                if ((proposed->flags & SWP_NOSIZE) == 0) {
-                    Dimensions proposed_size;
-
-
-                    proposed_size.width = proposed->cx;
-                    proposed_size.height = proposed->cy;
-                    if (
-                        component->size != proposed_size
-                        && 
-                        !component->onResizeProposed(proposed_size)
-                    ) {
-                        proposed->flags |= SWP_NOSIZE;
-                    }
+                if (
+                    (proposed->flags & SWP_NOSIZE) == 0
+                    &&
+                    (component->size.width != proposed->cx || component->size.height != proposed->cy)
+                ) {
+                    component->onResizeProposed(proposed->cx,proposed->cy);
                 }
-                if ((proposed->flags & SWP_NOMOVE) == 0) {
-                    Point      proposed_position;
-
-
-                    proposed_position.x = proposed->x;
-                    proposed_position.y = proposed->y;
-                    if (
-                        component->position != proposed_position 
-                        &&
-                        !component->onMoveProposed(proposed_position)
-                    ) {
-                        proposed->flags |= SWP_NOMOVE;
-                    }
+                if (
+                    (proposed->flags & SWP_NOMOVE) == 0
+                    &&
+                    (component->position.x != proposed->x || component->position.y != proposed->y)
+                ){
+                    component->onMoveProposed(proposed->x,proposed->y);
                 }
             }
 

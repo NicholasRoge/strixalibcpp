@@ -5,8 +5,6 @@
 #include <functional>
 #include <future>
 #include <map>
-#include <Strixa/Graphics/Dimensions.h>
-#include <Strixa/Graphics/Point.h>
 #include <Strixa/Util/TaskableThread.h>
 #include <Strixa/Util/ThreadObject.h>
 
@@ -37,6 +35,17 @@ namespace Strixa
 
             /* Instance Properties */
             private:
+                struct
+                {
+                    int x;
+                    int y;
+                } position;
+                struct
+                {
+                    int width;
+                    int height;
+                } size;
+
                 HBRUSH                        background;
                 bool                          enable_redraw : 1;
                 DWORD                         exitcode;
@@ -47,8 +56,6 @@ namespace Strixa
                 bool                          initialized;
                 RECT                          margin;
                 Frame*                        parent;
-                Strixa::Graphics::Point       position;
-                Strixa::Graphics::Dimensions  size;
                 DWORD                         style;
                 UiThread&                     ui_thread;
                 WNDCLASSEX                    window_class;
@@ -61,13 +68,13 @@ namespace Strixa
 
                 virtual void onMove();
 
-                virtual bool onMoveProposed(const Strixa::Graphics::Point& proposed_position);
+                virtual void onMoveProposed(int& x,int& y);
 
                 virtual void onPaint(HDC device_context);
 
                 virtual void onResize();
 
-                virtual bool onResizeProposed(const Strixa::Graphics::Dimensions& proposed_dimensions);
+                virtual void onResizeProposed(int& width,int& height);
 
             public:
                 Pane(const LPTSTR class_name = L"Generic Window Pane",UINT class_style = CS_HREDRAW | CS_VREDRAW);
@@ -86,17 +93,19 @@ namespace Strixa
 
                 DWORD getExtendedStyle() const;
 
-                RECT getMargins() const;
-
-                Frame* getParent() const;
-
-                DWORD getStyle() const;
+                int getHeight() const;
 
                 HWND getNativeHandle() const;
 
-                Strixa::Graphics::Point getPosition() const;
+                Frame* getParent() const;
 
-                Strixa::Graphics::Dimensions getSize() const;
+                int getPosX() const;
+
+                int getPosY() const;
+
+                DWORD getStyle() const;
+
+                int getWidth() const;
 
                 UiThread& getUiThread() const;
 
